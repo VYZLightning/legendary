@@ -2540,6 +2540,10 @@ def main():
     uninstall_parser = subparsers.add_parser('uninstall', help='Uninstall (delete) a game')
     verify_parser = subparsers.add_parser('verify', help='Verify a game\'s local files',
                                           aliases=('verify-game',), hide_aliases=True)
+    web_parser = subparsers.add_parser('web', help='Start the legendary web UI/API server')
+    web_parser.add_argument('--host', default='127.0.0.1', help='Host to bind to (default: 127.0.0.1)')
+    web_parser.add_argument('--port', default=6767, type=int, help='Port to listen on (default: 6767)')
+    web_parser.add_argument('--debug', action='store_true', help='Enable Flask debug mode')
 
     # hidden commands have no help text
     get_token_parser = subparsers.add_parser('get-token')
@@ -2959,6 +2963,9 @@ def main():
             cli.crossover_setup(args)
         elif args.subparser_name == 'move':
             cli.move(args)
+        elif args.subparser_name == 'web':
+            from legendary.webui.server import run as web_run
+            web_run(host=args.host, port=args.port, debug=args.debug)
     except KeyboardInterrupt:
         logger.info('Command was aborted via KeyboardInterrupt, cleaning up...')
 

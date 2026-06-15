@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Legendary Web UI</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --border: #2a2a3a;
+      --accent: #c07d3f;
+      --accent2: #7c5cbf;
+      --text: #e0dff0;
+      --muted: #7a7a9a;
+      --green: #4caf74;
+      --red: #cf6679;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+    }
+
+    #auth-badge {
+      margin-left: auto;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--border);
+      color: var(--muted);
+    }
+
+    #auth-badge.ok { background: #1e3d2a; color: var(--green); }
+    #auth-badge.err { background: #3d1e26; color: var(--red); }
+
+    nav {
+      display: flex;
+      gap: 4px;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    nav button {
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    nav button:hover { color: var(--text); background: var(--border); }
+    nav button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--accent); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .card .title { font-weight: 600; font-size: 13px; line-height: 1.3; }
+    .card .sub { font-size: 11px; color: var(--muted); word-break: break-all; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge.installed { background: #1e3d2a; color: var(--green); }
+    .badge.not-installed { background: var(--border); color: var(--muted); }
+
+    .loader {
+      text-align: center;
+      color: var(--muted);
+      padding: 48px 0;
+      font-size: 13px;
+    }
+
+    .search-bar {
+      margin-bottom: 16px;
+    }
+
+    .search-bar input {
+      width: 100%;
+      max-width: 360px;
+      padding: 8px 12px;
+      border-radius: 7px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .search-bar input:focus { border-color: var(--accent); }
+
+    .stat-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      min-width: 140px;
+    }
+
+    .stat .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .stat .value { font-size: 22px; font-weight: 700; color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Legendary</h1>
+  <span id="auth-badge">checking...</span>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('library')">Library</button>
+  <button onclick="showTab('installed')">Installed</button>
+  <button onclick="showTab('status')">Status</button>
+</nav>
+
+<main>
+  <!-- Library -->
+  <div id="tab-library" class="section active">
+    <div class="search-bar">
+      <input type="text" id="library-search" placeholder="Search library..." oninput="filterLibrary()" />
+    </div>
+    <div id="library-stats" class="stat-row"></div>
+    <div id="library-grid" class="grid"><div class="loader">Loading library…</div></div>
+  </div>
+
+  <!-- Installed -->
+  <div id="tab-installed" class="section">
+    <div id="installed-grid" class="grid"><div class="loader">Loading installed games…</div></div>
+  </div>
+
+  <!-- Status -->
+  <div id="tab-status" class="section">
+    <div id="status-content" class="loader">Loading…</div>
+  </div>
+</main>
+
+<script>
+  let allGames = [];
+
+  async function fetchJson(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  function showTab(name) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function fmt(bytes) {
+    if (!bytes) return '—';
+    const gb = bytes / 1073741824;
+    return gb >= 1 ? gb.toFixed(1) + ' GB' : (bytes / 1048576).toFixed(0) + ' MB';
+  }
+
+  function renderLibrary(games) {
+    const grid = document.getElementById('library-grid');
+    if (!games.length) { grid.innerHTML = '<div class="loader">No games found.</div>'; return; }
+    grid.innerHTML = games.map(g => `
+      <div class="card">
+        <div class="title">${esc(g.title)}</div>
+        <div class="sub">${esc(g.app_name)}</div>
+        <span class="badge ${g.installed ? 'installed' : 'not-installed'}">
+          ${g.installed ? 'Installed' : 'Not installed'}
+        </span>
+      </div>
+    `).join('');
+  }
+
+  function filterLibrary() {
+    const q = document.getElementById('library-search').value.toLowerCase();
+    renderLibrary(q ? allGames.filter(g => g.title.toLowerCase().includes(q) || g.app_name.toLowerCase().includes(q)) : allGames);
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function loadAuth() {
+    const badge = document.getElementById('auth-badge');
+    try {
+      const d = await fetchJson('/api/auth/status');
+      if (d.logged_in) {
+        badge.textContent = '✓ ' + d.user;
+        badge.className = 'ok';
+      } else {
+        badge.textContent = '✗ Not logged in';
+        badge.className = 'err';
+      }
+    } catch {
+      badge.textContent = '✗ Error';
+      badge.className = 'err';
+    }
+  }
+
+  async function loadLibrary() {
+    try {
+      allGames = await fetchJson('/api/games');
+      const installed = allGames.filter(g => g.installed).length;
+      document.getElementById('library-stats').innerHTML = `
+        <div class="stat"><div class="label">Total games</div><div class="value">${allGames.length}</div></div>
+        <div class="stat"><div class="label">Installed</div><div class="value">${installed}</div></div>
+        <div class="stat"><div class="label">Not installed</div><div class="value">${allGames.length - installed}</div></div>
+      `;
+      renderLibrary(allGames);
+    } catch (e) {
+      document.getElementById('library-grid').innerHTML = `<div class="loader">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function loadInstalled() {
+    const grid = document.getElementById('installed-grid');
+    try {
+      const games = await fetchJson('/api/games/installed');
+      if (!games.length) { grid.innerHTML = '<div class="loader">No games installed.</div>'; return; }
+      grid.innerHTML = games.map(g => `
+        <div class="card">
+          <div class="title">${esc(g.title)}</div>
+          <div class="sub">${esc(g.app_name)}</div>
+          <div class="sub">v${esc(g.version)} · ${fmt(g.install_size)}</div>
+          <div class="sub">${esc(g.install_path)}</div>
+          <span class="badge installed">Installed · ${esc(g.platform)}</span>
+        </div>
+      `).join('');
+    } catch (e) {
+      grid.innerHTML = `<div class="loader">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function loadStatus() {
+    const el = document.getElementById('status-content');
+    try {
+      const d = await fetchJson('/api/status');
+      el.style.textAlign = 'left';
+      el.innerHTML = `
+        <div class="stat-row">
+          <div class="stat"><div class="label">Version</div><div class="value" style="font-size:16px">${esc(d.version)}</div></div>
+          <div class="stat"><div class="label">Codename</div><div class="value" style="font-size:16px">${esc(d.codename)}</div></div>
+        </div>
+        <p style="color:var(--muted);font-size:12px">API running on <strong style="color:var(--text)">http://127.0.0.1:6767</strong></p>
+      `;
+    } catch (e) {
+      el.innerHTML = 'Error: ' + esc(e.message);
+    }
+  }
+
+  loadAuth();
+  loadLibrary();
+  loadInstalled();
+  loadStatus();
+</script>
+</body>
+</html>
